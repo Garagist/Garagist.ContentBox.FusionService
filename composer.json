@@ -1,0 +1,44 @@
+{
+    "name": "garagist/contentboxfusionservice",
+    "type": "neos-plugin",
+    "description": "Fusion service for flexible content box",
+    "license": "GPL-3.0-or-later",
+    "keywords": [
+        "flow",
+        "neos",
+        "fusion"
+    ],
+    "require": {
+        "neos/neos": "^7.0 || ~8.1.0 || ~8.2.0"
+    },
+    "authors": [
+        {
+            "name": "Jon Uhlmann",
+            "email": "hello@uhlmann.pro",
+            "homepage": "https://www.uhlmann.pro",
+            "role": "Developer"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Garagist\\ContentBox\\FusionService\\": "Classes"
+        }
+    },
+    "extra": {
+        "installer-name": "Garagist.ContentBox.FusionService",
+        "neos": {
+            "package-key": "Garagist.ContentBox.FusionService"
+        }
+    },
+    "archive": {
+        "exclude": [
+            ".editorconfig",
+            ".gitattributes",
+            ".github",
+            ".gitignore",
+            "CODE_OF_CONDUCT.md",
+            "LICENSE",
+            "phpcs.xml"
+        ]
+    }
+}
