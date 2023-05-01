@@ -7,24 +7,21 @@ use Neos\ContentRepository\Domain\Projection\Content\TraversableNodeInterface;
 use Neos\Flow\Annotations as Flow;
 use Neos\Fusion\Afx\Parser\AfxParserException;
 use Neos\Fusion\Afx\Service\AfxService;
+use Neos\Fusion\Core\FusionConfiguration;
+use Neos\Fusion\Core\FusionSourceCodeCollection;
 use Neos\Fusion\Core\Parser;
 use Neos\Fusion\Core\RuntimeFactory as FusionRuntimeFactory;
 use Neos\Fusion\Exception\RuntimeException;
-use Neos\Neos\Domain\Service\FusionService as NeosFusionService;
+use Neos\Neos\Domain\Repository\SiteRepository;
+use Neos\Neos\Domain\Service\FusionSourceCodeFactory;
 use Symfony\Component\Yaml\Yaml;
 
 /**
  * Class FusionService
  */
-class FusionService extends NeosFusionService
+class FusionService
 {
     use DummyControllerContextTrait;
-
-    /**
-     * @Flow\InjectConfiguration(path="fusion.autoInclude", package="Neos.Neos")
-     * @var array
-     */
-    protected $autoIncludeConfiguration = array();
 
     /**
      * @Flow\Inject
@@ -33,9 +30,27 @@ class FusionService extends NeosFusionService
     protected $fusionRuntimeFactory;
 
     /**
+     * @Flow\Inject
+     * @var Parser
+     */
+    protected $fusionParser;
+
+    /**
+     * @Flow\Inject
+     * @var FusionSourceCodeFactory
+     */
+    protected $fusionSourceCodeFactory;
+
+    /**
+     * @Flow\Inject
+     * @var SiteRepository
+     */
+    protected $siteRepository;
+
+    /**
      * Render the given string of AFX and returns it
      *
-     * @param [NodeInterface] $contextNodes
+     * @param TraversableNodeInterface[] $contextNodes
      * @param string $html
      * @param string|null $props
      * @return string
@@ -48,9 +63,9 @@ class FusionService extends NeosFusionService
 
         try {
             $fusion = AfxService::convertAfxToFusion($html);
-            $parsedFusion = $this->getMergedFusionObjectTree('html = ' . $fusion, $contextNodes['site'] ?? null);
+            $parsedFusion = $this->parseFusionSourceCode('html = ' . $fusion, $contextNodes['site'] ?? null);
 
-            $fusionRuntime = $this->fusionRuntimeFactory->create($parsedFusion, $controllerContext);
+            $fusionRuntime = $this->fusionRuntimeFactory->createFromConfiguration($parsedFusion, $controllerContext);
             $fusionRuntime->pushContext('props', $props);
             if (isset($contextNodes['node'])) {
                 $fusionRuntime->pushContext('node', $contextNodes['node']);
@@ -62,7 +77,6 @@ class FusionService extends NeosFusionService
                 $fusionRuntime->pushContext('site', $contextNodes['site']);
             }
             $fusionRuntime->setEnableContentCache(false);
-
             return $fusionRuntime->render('html');
         } catch (RuntimeException $e) {
             throw new ContentBoxRenderingException($e->getPrevious()->getMessage(), 1600950000, $e);
@@ -71,36 +85,34 @@ class FusionService extends NeosFusionService
         }
     }
 
-    /**
-     * @Flow\Inject
-     * @var Parser
-     */
-    protected $fusionParser;
-
-    /**
-     * Parse all the fusion files the are in the current fusionPathPatterns
-     *
-     * @param $fusion
-     * @param TraversableNodeInterface $startNode
-     * @return array
-     */
-    public function getMergedFusionObjectTree($fusion, ?TraversableNodeInterface $startNode = null): array
+    private function parseFusionSourceCode(string $fusionSourceCode, ?TraversableNodeInterface $currentSiteNode): FusionConfiguration
     {
-        $siteRootFusionCode = '';
-        if ($startNode) {
-            $siteResourcesPackageKey = $this->getSiteForSiteNode($startNode)->getSiteResourcesPackageKey();
-            $siteRootFusionPathAndFilename = sprintf('resource://%s/Private/Fusion/Root.fusion', $siteResourcesPackageKey);
-            $siteRootFusionCode = $this->getFusionIncludes([$siteRootFusionPathAndFilename]);
+        return $this->fusionParser->parseFromSource(
+            $this->tryFusionCodeCollectionFromSiteNode($currentSiteNode)
+                ->union(
+                    $this->fusionSourceCodeFactory->createFromNodeTypeDefinitions()
+                )
+                ->union(
+                    $this->fusionSourceCodeFactory->createFromAutoIncludes()
+                )
+                ->union(
+                    FusionSourceCodeCollection::fromFilePath('resource://Garagist.ContentBox/Private/ContentBox/Root.fusion')
+                )
+                ->union(
+                    FusionSourceCodeCollection::fromString($fusionSourceCode)
+                )
+        );
+    }
+
+    private function tryFusionCodeCollectionFromSiteNode(?TraversableNodeInterface $siteNode): FusionSourceCodeCollection
+    {
+        $site = null;
+        if ($siteNode) {
+            $site = $this->siteRepository->findOneByNodeName((string)$siteNode->getNodeName())
+                ?? throw new \Neos\Neos\Domain\Exception(sprintf('No site found for nodeNodeName "%s"', $siteNode->getNodeName()), 1677245517);
         }
-
-        $fusionCode = $this->generateNodeTypeDefinitions();
-        $fusionCode .= $this->getFusionIncludes($this->prepareAutoIncludeFusion());
-        $fusionCode .= $this->getFusionIncludes($this->prependFusionIncludes);
-        $fusionCode .= $siteRootFusionCode;
-        $fusionCode .= $this->getFusionIncludes($this->appendFusionIncludes);
-        $fusionCode .= $this->getFusionIncludes(['resource://Garagist.ContentBox/Private/ContentBox/Root.fusion']);
-        $fusionCode .= $fusion;
-
-        return $this->fusionParser->parse($fusionCode, null);
+        return $site
+            ? $this->fusionSourceCodeFactory->createFromSite($site)
+            : FusionSourceCodeCollection::empty();
     }
 }
