@@ -50,31 +50,28 @@ class FusionService
     /**
      * Render the given string of AFX and returns it
      *
-     * @param TraversableNodeInterface[] $contextNodes
+     * @param array $contextProperties
      * @param string $html
      * @param string|null $props
      * @return string
      * @throws ContentBoxRenderingException|AfxParserException
      */
-    public function render(array $contextNodes, string $html, ?string $props = null): string
+    public function render(array $contextProperties, string $html, ?string $props = null): string
     {
         $props = isset($props) ? Yaml::parse($props) : [];
         $controllerContext = $this->createDummyControllerContext();
 
         try {
             $fusion = AfxService::convertAfxToFusion($html);
-            $parsedFusion = $this->parseFusionSourceCode('html = ' . $fusion, $contextNodes['site'] ?? null);
+            $parsedFusion = $this->parseFusionSourceCode('html = ' . $fusion, $contextProperties['site'] ?? null);
 
             $fusionRuntime = $this->fusionRuntimeFactory->createFromConfiguration($parsedFusion, $controllerContext);
             $fusionRuntime->pushContext('props', $props);
-            if (isset($contextNodes['node'])) {
-                $fusionRuntime->pushContext('node', $contextNodes['node']);
-            }
-            if (isset($contextNodes['documentNode'])) {
-                $fusionRuntime->pushContext('documentNode', $contextNodes['documentNode']);
-            }
-            if (isset($contextNodes['site'])) {
-                $fusionRuntime->pushContext('site', $contextNodes['site']);
+
+            foreach ($contextProperties as $key => $value) {
+                if ($value) {
+                    $fusionRuntime->pushContext($key, $value);
+                }
             }
             $fusionRuntime->setEnableContentCache(false);
             return $fusionRuntime->render('html');
