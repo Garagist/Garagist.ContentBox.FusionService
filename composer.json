@@ -9,7 +9,7 @@
         "fusion"
     ],
     "require": {
-        "neos/neos": "^7.0 || ~8.1.0 || ~8.2.0"
+        "neos/neos": "^7.3 || ~8.1.0 || ~8.2.0"
     },
     "authors": [
         {
