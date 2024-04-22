@@ -11,6 +11,7 @@ use Neos\Fusion\Core\FusionConfiguration;
 use Neos\Fusion\Core\FusionSourceCodeCollection;
 use Neos\Fusion\Core\Parser;
 use Neos\Fusion\Core\RuntimeFactory as FusionRuntimeFactory;
+use Neos\Fusion\Exception;
 use Neos\Fusion\Exception\RuntimeException;
 use Neos\Neos\Domain\Repository\SiteRepository;
 use Neos\Neos\Domain\Service\FusionSourceCodeFactory;
@@ -80,6 +81,26 @@ class FusionService
         } catch (AfxParserException $e) {
             throw new ContentBoxRenderingException($e->getMessage(), 1600960000, $e);
         }
+    }
+
+    /**
+     * Output an exception as a string in a red colored box
+     *
+     * @param Exception $exeption
+     * @return string
+     */
+    public function renderException(Exception $exeption): string
+    {
+        $content = htmlspecialchars(
+            (string) $exeption->getMessage(),
+            ENT_NOQUOTES | ENT_HTML401,
+            ini_get('default_charset'),
+            true
+        );
+        $open =
+            '<span style="font-family: monospace; max-height: none; font-size: 1rem; width: 100%; margin: 30px auto; color: #fff; background: #d9534f; box-shadow: 0 1px 10px rgba(0,0,0,0.1); padding: 5% 12px; display: block; height: auto;">';
+        $close = '</span>';
+        return $open . $content . $close;
     }
 
     private function parseFusionSourceCode(string $fusionSourceCode, ?TraversableNodeInterface $currentSiteNode): FusionConfiguration
